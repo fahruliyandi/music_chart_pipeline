@@ -72,7 +72,7 @@ Hasil tes pertama `geo.getTopTracks` (17 Okt 2026) yang mengubah desain:
 - **Semua angka dikirim sebagai string** (`"159"`, `"1207"`). Transform wajib cast ke integer dan menolak baris yang gagal di-cast.
 - **Metriknya `listeners`, tanpa `playcount`** di chart Indonesia. `duration` dalam detik.
 - `mbid` terisi di sampel, tapi tetap tidak dijadikan key karena belum tentu terisi untuk semua lagu.
-- Chart Indonesia punya 10.000 baris (`total`), jadi top 200 selalu tersedia.
+- Chart Indonesia punya 10.000 baris (`total`), jadi top 200 selalu tersedia. Chart global juga mulai dari rank 0, dan mengirim `listeners` serta `playcount`; di chart Indonesia `playcount` selalu kosong (null).
 
 Klasifikasi kode error Last.fm. Response error bisa datang dengan key `error` di body, jadi status HTTP saja tidak cukup:
 
@@ -104,7 +104,7 @@ Star schema dengan **tiga jenis fakta**: dua periodic snapshot (posisi harian) d
 Aturan model:
 
 - **Surrogate key wajib di sini.** Kebalikan dari Spotify: `mbid` di Last.fm sering kosong, jadi tidak bisa jadi key. `track_key` = hash dari `artist|track` yang sudah dinormalisasi (lowercase, trim, spasi ganda dirapikan); `artist_key` = hash dari nama artis yang dinormalisasi.
-- **SCD2 di `dim_artist` untuk `primary_tag`.** Tag teratas artis bisa berubah. Q6 butuh genre _pada saat itu_, jadi chart tanggal d di-join ke versi artis yang `valid_from <= d < valid_to` (point-in-time join). Perubahan `url` atau `mbid` cukup ditimpa (SCD1).
+- **SCD2 di `dim_artist` untuk `primary_tag`.** Tag teratas artis bisa berubah. Tag Last.fm dibuat oleh user dan campur aduk antara genre dan non-genre (BTS punya "k-pop" dan "korean"), jadi `primary_tag` = tag pertama artis yang terdaftar di tabel referensi `ref_tag_genre` (tag → kelompok genre, diisi manual); kalau tidak ada yang cocok, nilainya `unknown`. Q6 butuh genre _pada saat itu_, jadi chart tanggal d di-join ke versi artis yang `valid_from <= d < valid_to` (point-in-time join). Perubahan `url` atau `mbid` cukup ditimpa (SCD1).
 - **Measure semi-additive dan non-additive.** `listeners` dan `playcount` di `fact_artist_stats_daily` itu angka kumulatif, sama seperti saldo rekening: tidak boleh dijumlah antar hari. Pertumbuhan harian dihitung pakai `LAG`. `rank` sama sekali tidak bisa dijumlah; yang masuk akal cuma `MIN`, `AVG`, atau perubahannya.
 - **`fact_chart_run` dibangun ulang dengan gaps-and-islands.** "Berturut-turut" dihitung dari tanggal yang run-nya sukses di `etl_run_log`, bukan dari kalender. Tanpa aturan ini, satu hari pipeline gagal akan memotong semua run jadi dua dan Q1 jadi salah.
 - **`dim_date` dibuat dengan recursive CTE**, rentang 2026-01-01 sampai 2027-12-31.
